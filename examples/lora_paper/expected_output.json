@@ -1,0 +1,45 @@
+{
+  "_note": "Manually derived from PRD.md Section 8 / notes.md in this folder. Use as a fixture for crossref engine tests, not as auto-generated output.",
+  "paper": {
+    "arxiv_id": "2106.09685",
+    "title": "LoRA: Low-Rank Adaptation of Large Language Models"
+  },
+  "repo": {
+    "url": "https://github.com/microsoft/LoRA"
+  },
+  "hyperparameters_paper": [
+    {"name": "batch_size", "value": "8", "source": "Table 11"},
+    {"name": "learning_rate", "value": "0.0002", "source": "Table 11"},
+    {"name": "weight_decay", "value": "0.01", "source": "Table 11"},
+    {"name": "epochs", "value": "5", "source": "Table 11"},
+    {"name": "warmup_steps", "value": "500", "source": "Table 11"},
+    {"name": "lora_rank", "value": "4", "source": "Table 11 (rq = rv = 4)"},
+    {"name": "lora_alpha", "value": "32", "source": "Table 11"},
+    {"name": "label_smoothing", "value": "0.1", "source": "Table 11"},
+    {"name": "dropout", "value": "0.1", "source": "Table 11 (Dropout Prob)"}
+  ],
+  "hyperparameters_repo": [
+    {"name": "train_batch_size", "value": "8"},
+    {"name": "lr", "value": "0.0002"},
+    {"name": "weight_decay", "value": "0.01"},
+    {"name": "max_epoch", "value": "5"},
+    {"name": "warmup_step", "value": "500"},
+    {"name": "lora_dim", "value": "4"},
+    {"name": "lora_alpha", "value": "32"},
+    {"name": "label_smooth", "value": "0.1"},
+    {"name": "lora_dropout", "value": "0.1"},
+    {"name": "random_seed", "value": "110"}
+  ],
+  "expected_findings": [
+    {"field": "batch_size", "status": "matched", "confidence": "high"},
+    {"field": "learning_rate", "status": "matched", "confidence": "high"},
+    {"field": "weight_decay", "status": "matched", "confidence": "high"},
+    {"field": "epochs", "status": "matched", "confidence": "high"},
+    {"field": "warmup_steps", "status": "matched", "confidence": "high"},
+    {"field": "lora_rank", "status": "matched", "confidence": "high", "note": "paper field 'Adaptation' maps to repo flag lora_dim"},
+    {"field": "lora_alpha", "status": "matched", "confidence": "high"},
+    {"field": "label_smoothing", "status": "matched", "confidence": "high"},
+    {"field": "dropout", "status": "matched", "confidence": "medium", "note": "fuzzy name match: 'Dropout Prob' vs lora_dropout"},
+    {"field": "random_seed", "status": "repo_only", "confidence": "high", "note": "repo pins a seed not mentioned anywhere in the paper's hyperparameter table"}
+  ]
+}

@@ -1,0 +1,24 @@
+[project]
+name = "papertrail"
+version = "0.1.0"
+description = "Cross-references an ML paper's stated setup against its GitHub repo to find reproducibility gaps."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pymupdf",
+    "anthropic",
+    "requests",
+    "pyyaml",
+    "click",
+    # local fallback model deps, add when llm/local_model.py is implemented
+    # "transformers",
+    # "torch",
+    # "sentence-transformers",
+]
+
+[project.scripts]
+papertrail = "papertrail.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
