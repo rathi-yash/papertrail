@@ -102,15 +102,15 @@ An initial manual prototype was run against the LoRA paper (arXiv:2106.09685) an
 
 ## 10. Build Plan (rough day-by-day)
 
-| Day | Focus |
-|---|---|
-| 1 | Paper ingestion + LLM-based hyperparameter/setup extraction (F1, F2). Prototype against 2-3 more real papers, including at least one messy one, before proceeding. |
-| 2 | Repo ingestion (F3): README, config, `ast`-based argument parsing. Cross-reference engine v1 (F4). |
-| 3 | Dataset/environment checks. Refine extraction accuracy based on Day 1 findings. |
-| 4 | Report generation (F5). Validate against 3-5 real paper+repo pairs; fix what breaks. |
-| 5 | CLI packaging (F6): BYOK/local-fallback config, `pip install`-able package. |
-| 6 | Stage 2 attempt (F7), if Days 1-5 are on schedule: Docker sandboxing, minimal run attempt, bounded error-feedback retry loop. |
-| 7 | Polish, write-up (including explicit acknowledgment of related prior work: ReproRepo, PaperBench, etc.), demo recording. |
+| Day | Focus | Status |
+|---|---|---|
+| 1 | Paper ingestion + LLM-based hyperparameter/setup extraction (F1, F2). Prototype against 2-3 more real papers, including at least one messy one, before proceeding. | **Done** (F1, F2 core; messy-paper prototyping still open — see Section 13) |
+| 2 | Repo ingestion (F3): README, config, `ast`-based argument parsing. Cross-reference engine v1 (F4). | Not started |
+| 3 | Dataset/environment checks. Refine extraction accuracy based on Day 1 findings. | Not started |
+| 4 | Report generation (F5). Validate against 3-5 real paper+repo pairs; fix what breaks. | Not started |
+| 5 | CLI packaging (F6): BYOK/local-fallback config, `pip install`-able package. | Not started |
+| 6 | Stage 2 attempt (F7), if Days 1-5 are on schedule: Docker sandboxing, minimal run attempt, bounded error-feedback retry loop. | Not started |
+| 7 | Polish, write-up (including explicit acknowledgment of related prior work: ReproRepo, PaperBench, etc.), demo recording. | Not started |
 
 ## 11. Risks
 
@@ -122,3 +122,46 @@ An initial manual prototype was run against the LoRA paper (arXiv:2106.09685) an
 ## 12. Positioning Note
 
 This tool is explicitly framed as a practical companion to, not a competitor with, existing academic reproducibility research (ReproRepo, PaperBench, Paper2Code, "What Papers Don't Tell You"). Those are benchmarks measuring whether frontier agents can do this at scale; PaperTrail is the tool a person actually runs today when they're stuck on one specific paper. This distinction should be stated explicitly in the project README.
+
+## 13. Implementation Status
+
+### Done — Day 1 (F1, F2 core)
+
+Built test-first (TDD); all tests are real code, no mocked business logic (LLM calls are dependency-injected with a fake client in tests, not mocked internals).
+
+| Module | What it does | Tests |
+|---|---|---|
+| `papertrail/paper/fetch.py` | `normalize_arxiv_url()`: abs→pdf URL normalization, strips version suffixes. `fetch_paper()`: downloads from arXiv or reads a local PDF path. | `tests/test_paper_fetch.py` (6 tests) |
+| `papertrail/paper/extract_text.py` | `extract_full_text()`: pymupdf text extraction. `isolate_relevant_sections()`: header-line heuristic (multi-word all-caps lines) splits the doc and maps headings to canonical keys (`hyperparameters`, `experimental_setup`, `dataset`, `hardware`) via keyword match. | `tests/test_paper_extract_text.py` (2 tests, run against the real downloaded LoRA PDF) |
+| `papertrail/paper/extract_structured.py` | `extract_structured()`: builds a "only extract what's stated" prompt from isolated sections, calls the LLM client, parses JSON (strips markdown code fences if present), returns a partial-result dict (`"partial": True`, empty fields) on empty input or malformed LLM output instead of raising. | `tests/test_paper_extract_structured.py` (5 tests, fake LLM client) |
+| `papertrail/llm/client.py` | `get_client()`: BYOK routing — `ANTHROPIC_API_KEY` env var or `--api-key` param → `ClaudeClient`; else → `LocalModel` fallback. `ClaudeClient.complete()` wraps the Anthropic SDK (SDK client injectable for testing). | `tests/test_llm_client.py` (4 tests) |
+| `papertrail/llm/local_model.py` | `LocalModel` stub — constructs cleanly (so BYOK routing is testable end-to-end) but `.complete()` raises `NotImplementedError` with a clear message. Full HF-model implementation deliberately deferred. | covered indirectly via `test_llm_client.py` |
+
+**Fixture:** `examples/lora_paper/2106.09685.pdf` — the real LoRA paper PDF, downloaded via `fetch_paper()`, used to validate that `isolate_relevant_sections()` actually finds Section D ("HYPERPARAMETERS USED IN EXPERIMENTS") on a real document, not a synthetic one.
+
+**How to verify:**
+```bash
+cd papertrail  # repo root
+source .venv/Scripts/activate
+python -m pytest -v   # 17 tests, all passing
+```
+To manually sanity-check extraction against the real Claude API (not covered by the automated tests, which use a fake client):
+```bash
+export ANTHROPIC_API_KEY=...
+python -c "
+from papertrail.paper.extract_text import extract_full_text, isolate_relevant_sections
+from papertrail.paper.extract_structured import extract_structured
+from papertrail.llm.client import get_client
+
+text = extract_full_text('examples/lora_paper/2106.09685.pdf')
+sections = isolate_relevant_sections(text)
+result = extract_structured(sections, get_client())
+print(result)
+"
+```
+
+### Known gaps / not yet done
+
+- Messy/poorly-documented second paper not yet prototyped against (PRD Section 11 risk, still open).
+- `extract_structured()` output not yet validated against `examples/lora_paper/expected_output.json` with a *real* Claude call — only unit-tested with a fake client so far.
+- `papertrail/cli.py`, `papertrail/repo/*`, `papertrail/crossref/*`, `papertrail/report/*`, `papertrail/sandbox/*` are all still TODO stubs (Days 2-7 of the build plan).
