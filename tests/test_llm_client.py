@@ -1,6 +1,6 @@
 """Tests for papertrail.llm.client BYOK routing."""
 
-from papertrail.llm.client import ClaudeClient, get_client
+from papertrail.llm.client import ClaudeClient, GeminiClient, get_client
 from papertrail.llm.local_model import LocalModel
 
 
@@ -13,14 +13,35 @@ def test_get_client_returns_claude_client_when_api_key_passed():
 
 def test_get_client_reads_api_key_from_env(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-key-from-env")
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
 
     client = get_client()
 
     assert isinstance(client, ClaudeClient)
 
 
-def test_get_client_falls_back_to_local_model_when_no_key(monkeypatch):
+def test_get_client_prefers_claude_over_gemini_when_both_set(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-anthropic-key")
+    monkeypatch.setenv("GOOGLE_API_KEY", "fake-google-key")
+
+    client = get_client()
+
+    assert isinstance(client, ClaudeClient)
+
+
+def test_get_client_uses_gemini_when_only_google_key_set(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("GOOGLE_API_KEY", "fake-google-key")
+
+    client = get_client()
+
+    assert isinstance(client, GeminiClient)
+    assert client.backend_name == "gemini"
+
+
+def test_get_client_falls_back_to_local_model_when_no_keys(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
 
     client = get_client()
 
@@ -63,3 +84,33 @@ def test_claude_client_complete_returns_response_text():
     assert fake_sdk_client.messages.last_call_kwargs["messages"] == [
         {"role": "user", "content": "say hello"}
     ]
+
+
+class _FakeGeminiResponse:
+    def __init__(self, text):
+        self.text = text
+
+
+class _FakeGeminiModels:
+    def __init__(self, response_text):
+        self._response_text = response_text
+        self.last_call_kwargs = None
+
+    def generate_content(self, **kwargs):
+        self.last_call_kwargs = kwargs
+        return _FakeGeminiResponse(self._response_text)
+
+
+class _FakeGeminiSdkClient:
+    def __init__(self, response_text):
+        self.models = _FakeGeminiModels(response_text)
+
+
+def test_gemini_client_complete_returns_response_text():
+    fake_sdk_client = _FakeGeminiSdkClient(response_text="hello from gemini")
+    client = GeminiClient(api_key="fake-key", sdk_client=fake_sdk_client)
+
+    result = client.complete("say hello")
+
+    assert result == "hello from gemini"
+    assert fake_sdk_client.models.last_call_kwargs["contents"] == "say hello"

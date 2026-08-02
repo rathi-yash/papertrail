@@ -35,7 +35,13 @@ def main() -> None:
     default=None,
     help="Anthropic API key (overrides ANTHROPIC_API_KEY env var).",
 )
-def extract(source: str, api_key: str | None) -> None:
+@click.option(
+    "--google-api-key",
+    default=None,
+    help="Google (Gemini) API key (overrides GOOGLE_API_KEY env var). "
+    "Used if no Anthropic key is available.",
+)
+def extract(source: str, api_key: str | None, google_api_key: str | None) -> None:
     """Extract structured hyperparameter/dataset/environment data from SOURCE.
 
     SOURCE is an arXiv URL (e.g. https://arxiv.org/abs/2106.09685) or a
@@ -52,7 +58,7 @@ def extract(source: str, api_key: str | None) -> None:
         Path(tmp_path).unlink(missing_ok=True)
 
     sections = isolate_relevant_sections(text)
-    client = get_client(api_key=api_key)
+    client = get_client(api_key=api_key, google_api_key=google_api_key)
     result = extract_structured(sections, client)
 
     click.echo(json.dumps(result, indent=2))
